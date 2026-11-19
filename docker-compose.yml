@@ -6,6 +6,7 @@ services:
       RECEIVER_NAME: A
       LISTEN_PORT: "9001"
       REPLY_DELAY: "0"          # 默认回包延迟（秒）；报文 "DELAY:<秒>:" 可单次覆盖
+      MULTI_ADDR: "1"           # 监听本机所有 IPv4 地址，回包复用收包地址
     networks: [telemetry]
 
   receiver-b:
@@ -15,6 +16,7 @@ services:
       RECEIVER_NAME: B
       LISTEN_PORT: "9001"
       REPLY_DELAY: "0"
+      MULTI_ADDR: "1"
     networks: [telemetry]
 
   proxy:
@@ -22,6 +24,9 @@ services:
     container_name: telemetry-proxy
     environment:
       UDP_LISTEN_PORT: "9000"
+      # 容器内通配监听；宿主机上的多个本机地址（如 127.0.0.1 与 127.0.0.2）
+      # 需要都映射到同一 UDP 端口，代理才能区分入口并从原入口回包。
+      UDP_LISTEN_HOST: "0.0.0.0"
       HTTP_PORT: "8080"
       SESSION_IDLE_TIMEOUT: "5"          # 会话空闲超时（秒）
       RECEIVER_A_HOST: receiver-a
@@ -29,9 +34,11 @@ services:
       RECEIVER_B_HOST: receiver-b
       RECEIVER_B_PORT: "9001"
       DB_PATH: /data/proxy.db            # 目标接收器持久化（重启保留）
+      TEST_ENTRANCES: "127.0.0.1,127.0.0.2"   # 首页可选试传入口
       # UPSTREAM_PORT_COOLDOWN: "30"     # 上游端口冷却，须大于最大回包延迟
     ports:
-      - "9000:9000/udp"                  # 遥测终端发往这里
+      - "127.0.0.1:9000:9000/udp"        # 入口一：遥测终端发往这里
+      - "127.0.0.2:9000:9000/udp"        # 入口二：同一容器端口，另一个本机地址
       - "8080:8080"                      # 操作网页
     volumes:
       - proxy-data:/data
